@@ -12,21 +12,29 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
+            background-color: #121212;
+            color: #ffffff;
         }
         .container {
-            text-align: center;
-            background-color: white;
+            width: 90%;
+            max-width: 600px;
+            background-color: #1e1e1e;
             padding: 2rem;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
-        input {
+        textarea {
             width: 100%;
             padding: 0.5rem;
             margin-bottom: 1rem;
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            color: #ffffff;
+            border-radius: 4px;
+            resize: vertical;
+            min-height: 40px;
         }
         button {
             background-color: #4CAF50;
@@ -41,17 +49,55 @@
             cursor: pointer;
             border-radius: 4px;
         }
+        #qrcode {
+            margin-top: 1rem;
+            background-color: white;
+            padding: 1rem;
+            border-radius: 4px;
+        }
+        #history {
+            margin-top: 2rem;
+            border-top: 1px solid #444;
+            padding-top: 1rem;
+        }
+        .history-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            background-color: #2c2c2c;
+            border-radius: 4px;
+        }
+        .history-item img {
+            width: 50px;
+            height: 50px;
+            margin-right: 1rem;
+        }
+        .history-item .content {
+            flex-grow: 1;
+        }
+        .history-item .delete {
+            background-color: #f44336;
+            margin-left: 1rem;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>QR Code Generator</h1>
-        <input type="text" id="text-input" placeholder="Enter text or URL">
+        <textarea id="text-input" placeholder="Enter text or URL" rows="1"></textarea>
         <button onclick="generateQRCode()">Generate QR Code</button>
         <div id="qrcode"></div>
+        <button id="download" style="display: none;">Download QR Code</button>
+        <div id="history">
+            <h2>History</h2>
+            <div id="history-list"></div>
+        </div>
     </div>
 
     <script>
+        let history = [];
+
         function generateQRCode() {
             const text = document.getElementById('text-input').value;
             const qrcodeContainer = document.getElementById('qrcode');
@@ -66,8 +112,80 @@
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.H
                 });
+
+                const downloadBtn = document.getElementById('download');
+                downloadBtn.style.display = 'inline-block';
+                downloadBtn.onclick = () => {
+                    const img = qrcodeContainer.querySelector('img');
+                    const link = document.createElement('a');
+                    link.href = img.src;
+                    link.download = 'qrcode.png';
+                    link.click();
+                };
+
+                addToHistory(text);
             }
         }
+
+        function addToHistory(text) {
+            const now = new Date();
+            history.unshift({ text, date: now.toLocaleString() });
+            if (history.length > 10) history.pop();
+            updateHistoryList();
+            saveHistory();
+        }
+
+        function updateHistoryList() {
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            history.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <img src="${generateQRCodeDataURL(item.text)}" alt="QR Code">
+                    <div class="content">
+                        <div>${item.text}</div>
+                        <small>${item.date}</small>
+                    </div>
+                    <button class="delete" onclick="deleteHistoryItem(${index})">Delete</button>
+                `;
+                historyList.appendChild(div);
+            });
+        }
+
+        function deleteHistoryItem(index) {
+            history.splice(index, 1);
+            updateHistoryList();
+            saveHistory();
+        }
+
+        function generateQRCodeDataURL(text) {
+            const canvas = document.createElement('canvas');
+            QRCode.toCanvas(canvas, text, { width: 50, height: 50 });
+            return canvas.toDataURL();
+        }
+
+        function saveHistory() {
+            localStorage.setItem('qrCodeHistory', JSON.stringify(history));
+        }
+
+        function loadHistory() {
+            const savedHistory = localStorage.getItem('qrCodeHistory');
+            if (savedHistory) {
+                history = JSON.parse(savedHistory);
+                updateHistoryList();
+            }
+        }
+
+        // Auto-grow textarea
+        const textarea = document.getElementById('text-input');
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Load history on page load
+        window.onload = loadHistory;
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js')
